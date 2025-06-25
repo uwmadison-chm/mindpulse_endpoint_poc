@@ -94,7 +94,7 @@ def test_upload_single_file(client):
 
 
 def test_upload_invalid_file_type(client):
-    """Test upload endpoint with invalid file type."""
+    """Test upload endpoint with any file type (no validation)."""
     file_data = b"fake file data"
     
     response = client.post(
@@ -103,8 +103,12 @@ def test_upload_invalid_file_type(client):
         content_type="multipart/form-data"
     )
     
-    # Should return 400 because no valid files were found
-    assert response.status_code == 400
+    # Should return 201 because we accept all file types now
+    assert response.status_code == 201
+    data = response.get_json()
+    assert "message" in data
+    assert "files" in data
+    assert len(data["files"]) == 1
 
 
 def test_upload_multiple_files(client):

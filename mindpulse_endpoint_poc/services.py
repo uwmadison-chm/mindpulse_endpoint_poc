@@ -2,107 +2,52 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any
 from flask import Request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from .utils import allowed_file, get_secure_filename, ensure_directory_exists, get_unique_filename
+from .utils import get_secure_filename, ensure_directory_exists, get_unique_filename
 
 logger = logging.getLogger(__name__)
 
 
-def validate_and_collect_files(request: Request, config: dict) -> Tuple[List, List[str]]:
+def collect_files(request: Request) -> List:
     """
-    Validate and collect files from the request.
+    Collect all files from the request, regardless of key.
     
     Args:
         request: Flask request object
-        config: Flask app config dictionary
-        
     Returns:
-        Tuple of (files, filenames) lists
+        List of file objects
     """
-    max_files = config.get("MAX_FILES_PER_REQUEST", 1000)
-    allowed_extensions = config.get("ALLOWED_EXTENSIONS", {".png", ".jpg", ".jpeg", ".gif", ".bmp"})
-    
-    files: List = []
-    filenames: List[str] = []
-    
-    for i in range(1, max_files + 1):
-        file_key = f"file{i}"
-        file = request.files.get(file_key)
-        
-        if not file:
-            break
-            
-        # Validate file extension
-        if not allowed_file(file.filename, allowed_extensions):
-            logger.warning(f"Rejected file with invalid extension: {file.filename}")
-            continue
-        
-        # Get secure filename
-        secure_name = get_secure_filename(file.filename)
-        if not secure_name:
-            logger.warning(f"Could not create secure filename for: {file.filename}")
-            continue
-        
-        files.append(file)
-        filenames.append(secure_name)
-    
-    return files, filenames
+    return list(request.files.values())
 
 
-def save_files_to_disk(files: List, filenames: List[str], upload_folder: str) -> Tuple[List[str], Optional[str]]:
+def save_files_to_disk(files: List, upload_folder: Path) -> List[str]:
     """
     Save files to disk and return list of saved filenames.
     
     Args:
         files: List of file objects
-        filenames: List of filenames
-        upload_folder: Directory to save files to
+        upload_folder: Directory to save files to (as Path)
         
     Returns:
-        Tuple of (saved_filenames, error_message). error_message is None if successful.
+        List of saved filenames
     """
     saved_files: List[str] = []
     
-    for file, filename in zip(files, filenames):
-        try:
-            # Ensure unique filename
-            unique_filename = get_unique_filename(upload_folder, filename)
-            file_path = Path(upload_folder) / unique_filename
-            file.save(str(file_path))
-            saved_files.append(unique_filename)
-            logger.info(f"Successfully saved file: {unique_filename}")
-        except Exception as e:
-            logger.error(f"Failed to save file {filename}: {e}")
-            return [], f"Failed to save file {filename}"
-    
-    return saved_files, None
-
-
-def verify_files_exist(saved_files: List[str], upload_folder: str) -> Optional[str]:
-    """
-    Verify that all saved files actually exist on disk.
-    
-    Args:
-        saved_files: List of filenames that should exist
-        upload_folder: Directory where files should be
+    for file in files:
+        # Get secure filename from the file object
+        secure_name = get_secure_filename(file.filename)
         
-    Returns:
-        Error message if any files are missing, None if all exist
-    """
-    missing_files = []
-    for filename in saved_files:
-        file_path = Path(upload_folder) / filename
-        if not file_path.exists():
-            missing_files.append(filename)
+        # Ensure unique filename
+        unique_filename = get_unique_filename(str(upload_folder), secure_name)
+        file_path = upload_folder / unique_filename
+        file.save(str(file_path))
+        saved_files.append(unique_filename)
+        logger.info(f"Successfully saved file: {unique_filename}")
     
-    if missing_files:
-        logger.error(f"Files not found after save: {missing_files}")
-        return f"Files not found after save: {missing_files}"
-    
-    return None
+    return saved_files
 
 
 def handle_upload(request: Request, config: dict) -> Tuple[Dict[str, Any], int]:
@@ -117,32 +62,26 @@ def handle_upload(request: Request, config: dict) -> Tuple[Dict[str, Any], int]:
         JSON-serializable dict and HTTP status code
     """
     try:
-        upload_folder = config.get("UPLOAD_FOLDER", "/tmp/mindpulse_uploads")
+        upload_folder_str = config.get("UPLOAD_FOLDER", "/tmp/mindpulse_uploads")
+        upload_folder = Path(upload_folder_str)
         
         # Ensure upload directory exists
-        ensure_directory_exists(upload_folder)
+        ensure_directory_exists(str(upload_folder))
         
-        # Validate and collect files
-        files, filenames = validate_and_collect_files(request, config)
+        # Collect files
+        files = collect_files(request)
         
         if not files:
-            return {"error": "No valid files found in request"}, 400
+            return {"error": "No files found in request"}, 400
         
         # Save files to disk
-        saved_files, save_error = save_files_to_disk(files, filenames, upload_folder)
-        if save_error:
-            return {"error": save_error}, 500
-        
-        # Verify files were saved
-        verify_error = verify_files_exist(saved_files, upload_folder)
-        if verify_error:
-            return {"error": verify_error}, 500
+        saved_files = save_files_to_disk(files, upload_folder)
         
         logger.info(f"Successfully uploaded {len(saved_files)} files")
         return {
             "message": f"{len(saved_files)} files uploaded successfully",
             "files": saved_files,
-            "upload_folder": upload_folder
+            "upload_folder": str(upload_folder)
         }, 201
 
     except RequestEntityTooLarge:

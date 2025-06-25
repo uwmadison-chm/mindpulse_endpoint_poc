@@ -23,12 +23,7 @@ class Config:
     except ValueError as e:
         print(f"Warning: Invalid MAX_CONTENT_LENGTH format '{_max_content_length_str}'. Using default 16M. Error: {e}")
         MAX_CONTENT_LENGTH: int = 16 * 1024 * 1024  # 16MB default
-    
-    ALLOWED_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
-    
-    # File handling
-    MAX_FILES_PER_REQUEST: int = int(os.environ.get("MAX_FILES_PER_REQUEST", "1000"))
-    
+        
     @classmethod
     def init_app(cls, app) -> None:
         """Initialize the application with this configuration."""

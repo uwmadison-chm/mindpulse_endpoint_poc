@@ -6,7 +6,7 @@ A proof-of-concept Flask application for handling Android screenshot uploads. Th
 
 - **File Upload Endpoint**: Accepts multiple files via POST requests
 - **Local Storage**: Stores uploaded files in a configurable local directory
-- **File Validation**: Validates file extensions and ensures secure filenames
+- **Simple & Fast**: No file validation or verification - just saves files
 - **Configuration Management**: Environment-based configuration with multiple profiles
 - **Health Check**: Built-in health check endpoint
 - **Modern Python**: Uses Python 3.13+ with type hints and modern practices
@@ -58,7 +58,6 @@ The application uses environment variables for configuration. Copy `env.example`
 - `SECRET_KEY`: Flask secret key (required in production)
 - `UPLOAD_FOLDER`: Directory to store uploaded files (default: `/tmp/mindpulse_uploads`)
 - `MAX_CONTENT_LENGTH`: Maximum file size in bytes (default: 16MB)
-- `MAX_FILES_PER_REQUEST`: Maximum files per request (default: 1000)
 
 ## API Endpoints
 
@@ -69,7 +68,7 @@ Uploads multiple files from Android devices.
 **Request:**
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Files should be named `file1`, `file2`, `file3`, etc.
+- Files can be named anything (e.g., `file1`, `file2`, `screenshot.png`, etc.)
 
 **Example using curl:**
 ```bash
@@ -87,11 +86,7 @@ curl -X POST http://localhost:5000/api/v1/upload \
 }
 ```
 
-**Supported file types:**
-- PNG (`.png`)
-- JPEG (`.jpg`, `.jpeg`)
-- GIF (`.gif`)
-- BMP (`.bmp`)
+**Note:** All file types are accepted. No validation is performed - files are simply saved to the upload directory.
 
 ### GET /api/v1/health
 
@@ -101,7 +96,8 @@ Health check endpoint.
 ```json
 {
   "status": "healthy",
-  "service": "mindpulse-endpoint-poc"
+  "service": "mindpulse-endpoint-poc",
+  "version": "v1"
 }
 ```
 
@@ -138,9 +134,10 @@ mindpulse_endpoint_poc/
 ├── mindpulse_endpoint_poc/
 │   ├── __init__.py          # Package initialization
 │   ├── app.py              # Flask application factory
+│   ├── api_v1.py           # API v1 routes
 │   ├── config.py           # Configuration management
-│   ├── utils.py            # Utility functions
-│   └── views.py            # API endpoints
+│   ├── services.py         # Business logic
+│   └── utils.py            # Utility functions
 ├── main.py                 # Application entry point
 ├── pyproject.toml          # Project configuration
 ├── env.example             # Environment variables example
@@ -149,7 +146,6 @@ mindpulse_endpoint_poc/
 
 ## Security Considerations
 
-- **File Validation**: Only allows specific image file extensions
 - **Secure Filenames**: Uses Werkzeug's `secure_filename` to prevent path traversal
 - **File Size Limits**: Configurable maximum file size
 - **Unique Filenames**: Prevents filename conflicts
