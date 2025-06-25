@@ -1,0 +1,9 @@
+[project]
+name = "mindpulse-endpoint-poc"
+version = "0.1.0"
+description = "Proof-of-concept endpoint for the MindPulse Android screenshot app"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.1.1",
+]
