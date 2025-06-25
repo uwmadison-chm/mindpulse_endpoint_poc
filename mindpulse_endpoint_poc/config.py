@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
 
 from .utils import parse_size_string
 
@@ -14,7 +15,7 @@ class Config:
     SECRET_KEY: str = os.environ.get("SECRET_KEY") or "dev-secret-key-change-in-production"
     
     # Upload configuration
-    UPLOAD_FOLDER: str = os.environ.get("UPLOAD_FOLDER") or "/tmp/mindpulse_uploads"
+    UPLOAD_FOLDER: Path = Path(os.environ.get("UPLOAD_FOLDER", "/tmp/mindpulse_uploads"))
     
     # Parse MAX_CONTENT_LENGTH from human-readable string
     _max_content_length_str = os.environ.get("MAX_CONTENT_LENGTH", "16M")
@@ -28,8 +29,7 @@ class Config:
     def init_app(cls, app) -> None:
         """Initialize the application with this configuration."""
         # Ensure upload directory exists
-        upload_path = Path(cls.UPLOAD_FOLDER)
-        upload_path.mkdir(parents=True, exist_ok=True)
+        cls.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
         
         # Set Flask configuration
         app.config["SECRET_KEY"] = cls.SECRET_KEY
@@ -48,7 +48,7 @@ class TestingConfig(Config):
     
     DEBUG: bool = False
     TESTING: bool = True
-    UPLOAD_FOLDER: str = "/tmp/mindpulse_test_uploads"
+    UPLOAD_FOLDER: Path = Path("/tmp/mindpulse_test_uploads")
     WTF_CSRF_ENABLED: bool = False
 
 
@@ -74,4 +74,27 @@ config = {
     "testing": TestingConfig,
     "production": ProductionConfig,
     "default": DevelopmentConfig,
-} 
+}
+
+
+def get_config(config_name: Optional[str] = None):
+    """
+    Get configuration class for the specified environment.
+    
+    This function can be used by both the Flask app and processor script
+    to ensure consistent configuration management.
+    
+    Args:
+        config_name: Name of the configuration to use. If None, will use
+                    FLASK_ENV environment variable or default to 'development'
+    
+    Returns:
+        Configuration class instance
+    """
+    # Load environment variables from .env file if it exists
+    load_dotenv()
+    
+    if config_name is None:
+        config_name = os.environ.get("FLASK_ENV", "development")
+    
+    return config[config_name] 

@@ -68,13 +68,15 @@ Uploads multiple files from Android devices.
 **Request:**
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Files can be named anything (e.g., `file1`, `file2`, `screenshot.png`, etc.)
+- Files must be named according to the pattern "{subject_hash}_{timestamp}.{ext}" -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an epoch time with millisecond precision. {ext} will generally, but not necessarily, be an image extension
+- Files not matching this pattern will be logged but not saved.
+- Files in a batch should have the same subject_hash but it's not a problem if they don't
 
 **Example using curl:**
 ```bash
 curl -X POST http://localhost:5000/api/v1/upload \
-  -F "file1=@screenshot1.png" \
-  -F "file2=@screenshot2.jpg"
+  -F "file1=@12345678_1750890839000.png" \
+  -F "file2=@12345678_1750890853000.png"
 ```
 
 **Response:**
@@ -87,6 +89,7 @@ curl -X POST http://localhost:5000/api/v1/upload \
 ```
 
 **Note:** All file types are accepted. No validation is performed - files are simply saved to the upload directory.
+
 
 ### GET /api/v1/health
 

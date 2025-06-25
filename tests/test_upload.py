@@ -11,6 +11,7 @@ from flask import Flask
 
 from mindpulse_endpoint_poc.app import create_app
 from mindpulse_endpoint_poc.utils import parse_size_string
+from mindpulse_endpoint_poc.services import parse_filename
 
 
 @pytest.fixture
@@ -77,12 +78,12 @@ def test_upload_no_files(client):
 
 def test_upload_single_file(client):
     """Test upload endpoint with a single file."""
-    # Create a mock image file
+    # Create a mock image file with proper naming format
     image_data = b"fake image data"
     
     response = client.post(
         "/api/v1/upload",
-        data={"file1": (BytesIO(image_data), "test.png")},
+        data={"file1": (BytesIO(image_data), "12345678_1750890839000.png")},
         content_type="multipart/form-data"
     )
     
@@ -91,35 +92,32 @@ def test_upload_single_file(client):
     assert "message" in data
     assert "files" in data
     assert len(data["files"]) == 1
+    assert data["files"][0] == "12345678/12345678_1750890839000.png"
 
 
-def test_upload_invalid_file_type(client):
-    """Test upload endpoint with any file type (no validation)."""
+def test_upload_invalid_filename_format(client):
+    """Test upload endpoint with invalid filename format."""
     file_data = b"fake file data"
     
     response = client.post(
         "/api/v1/upload",
-        data={"file1": (BytesIO(file_data), "test.txt")},
+        data={"file1": (BytesIO(file_data), "invalid_filename.txt")},
         content_type="multipart/form-data"
     )
     
-    # Should return 201 because we accept all file types now
-    assert response.status_code == 201
-    data = response.get_json()
-    assert "message" in data
-    assert "files" in data
-    assert len(data["files"]) == 1
+    # Should return 400 because no valid files were found
+    assert response.status_code == 400
 
 
-def test_upload_multiple_files(client):
-    """Test upload endpoint with multiple files."""
+def test_upload_multiple_files_same_batch(client):
+    """Test upload endpoint with multiple files in the same batch."""
     image_data = b"fake image data"
     
     response = client.post(
         "/api/v1/upload",
         data={
-            "file1": (BytesIO(image_data), "test1.png"),
-            "file2": (BytesIO(image_data), "test2.jpg"),
+            "file1": (BytesIO(image_data), "12345678_1750890839000.png"),
+            "file2": (BytesIO(image_data), "12345678_1750890853000.png"),
         },
         content_type="multipart/form-data"
     )
@@ -127,6 +125,27 @@ def test_upload_multiple_files(client):
     assert response.status_code == 201
     data = response.get_json()
     assert len(data["files"]) == 2
+    assert all(f.startswith("12345678/") for f in data["files"])
+
+
+def test_upload_multiple_batches(client):
+    """Test upload endpoint with files from different batches."""
+    image_data = b"fake image data"
+    
+    response = client.post(
+        "/api/v1/upload",
+        data={
+            "file1": (BytesIO(image_data), "12345678_1750890839000.png"),
+            "file2": (BytesIO(image_data), "87654321_1750890853000.jpg"),
+        },
+        content_type="multipart/form-data"
+    )
+    
+    assert response.status_code == 201
+    data = response.get_json()
+    assert len(data["files"]) == 2
+    assert "12345678/12345678_1750890839000.png" in data["files"]
+    assert "87654321/87654321_1750890853000.jpg" in data["files"]
 
 
 def test_upload_method_not_allowed(client):

@@ -4,9 +4,8 @@ import logging
 import os
 from typing import Optional
 from flask import Flask
-from dotenv import load_dotenv
 
-from .config import config
+from .config import get_config
 from .api_v1 import register_api_v1_routes
 from . import services  # Import to ensure module is loaded
 
@@ -22,19 +21,15 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     Returns:
         Configured Flask application instance
     """
-    # Load environment variables from .env file if it exists
-    load_dotenv()
-    
-    # Determine configuration
-    if config_name is None:
-        config_name = os.environ.get("FLASK_ENV", "development")
+    # Get configuration using shared function
+    config_class = get_config(config_name)
     
     # Create Flask app
     app = Flask(__name__)
     
     # Load configuration
-    app.config.from_object(config[config_name])
-    config[config_name].init_app(app)
+    app.config.from_object(config_class)
+    config_class.init_app(app)
     
     # Configure logging
     if not app.debug and not app.testing:
