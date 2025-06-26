@@ -220,7 +220,7 @@ python processor_example.py production
 
 ```
 /etc/mindpulse/keys/
-├── 12345678.key  # Hex-encoded AES key for subject 12345678
-├── abcdef12.key  # Hex-encoded AES key for subject abcdef12
+├── 12345678  # Hex-encoded AES key for subject 12345678
+├── abcdef12  # Hex-encoded AES key for subject abcdef12
 └── ...
 ```

@@ -85,7 +85,7 @@ class BatchProcessor:
     
     def get_aes_key(self, subject_hash: str) -> Optional[bytes]:
         """Get AES key for a subject from the keys directory."""
-        key_file = self.keys_dir / f"{subject_hash}.key"
+        key_file = self.keys_dir / f"{subject_hash}"
         if not key_file.exists():
             logger.error(f"Key file not found for subject {subject_hash}: {key_file}")
             return None
@@ -204,9 +204,6 @@ class BatchProcessor:
         temp_dir.mkdir(exist_ok=True)
         
         for file_path in batch_dir.iterdir():
-            if file_path.is_file() and file_path.name.endswith('.key'):
-                continue  # Skip key files
-            
             if file_path.is_file():
                 try:
                     logger.info(f"Processing {file_path.name}")
