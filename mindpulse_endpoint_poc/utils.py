@@ -1,6 +1,5 @@
 """Utility functions for the MindPulse Endpoint POC."""
 
-import os
 import re
 from pathlib import Path
 from typing import Optional

@@ -8,6 +8,8 @@ dependencies = [
     "flask>=3.1.1",
     "python-dotenv>=1.0.0",
     "werkzeug>=3.0.0",
+    "cryptography>=41.0.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +23,10 @@ dev = [
 
 [project.scripts]
 mindpulse-endpoint = "mindpulse_endpoint_poc.app:create_app"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 88

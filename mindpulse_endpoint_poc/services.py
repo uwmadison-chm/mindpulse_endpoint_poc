@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Any
 from flask import Request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from .utils import get_secure_filename, ensure_directory_exists, get_unique_filename
+from .utils import ensure_directory_exists
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def collect_files(request: Request) -> List:
 
 def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[List[str], List[str]]:
     """
-    Save files to batch directories organized by subject_hash.
+    Save files to batch directories organized by subject_hash in the incoming directory.
     
     Args:
         files: List of file objects
@@ -60,6 +60,10 @@ def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[Lis
     """
     saved_files: List[str] = []
     invalid_files: List[str] = []
+    
+    # Create incoming directory
+    incoming_dir = upload_folder / "incoming"
+    ensure_directory_exists(str(incoming_dir))
     
     # Group files by subject_hash
     batch_directories: Dict[str, List] = {}
@@ -74,7 +78,7 @@ def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[Lis
             continue
         
         # Create batch directory if it doesn't exist
-        batch_dir = upload_folder / subject_hash
+        batch_dir = incoming_dir / subject_hash
         if subject_hash not in batch_directories:
             batch_directories[subject_hash] = []
             ensure_directory_exists(str(batch_dir))
@@ -83,7 +87,7 @@ def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[Lis
     
     # Save files to their respective batch directories
     for subject_hash, file_list in batch_directories.items():
-        batch_dir = upload_folder / subject_hash
+        batch_dir = incoming_dir / subject_hash
         
         for file, original_filename in file_list:
             # Use original filename as-is (it's already properly formatted)
@@ -98,8 +102,8 @@ def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[Lis
                 logger.info(f"Filename conflict resolved: {original_filename} -> {unique_filename}")
             
             file.save(str(file_path))
-            saved_files.append(f"{subject_hash}/{original_filename}")
-            logger.info(f"Saved file: {subject_hash}/{original_filename}")
+            saved_files.append(f"incoming/{subject_hash}/{original_filename}")
+            logger.info(f"Saved file: incoming/{subject_hash}/{original_filename}")
     
     return saved_files, invalid_files
 
@@ -136,9 +140,7 @@ def handle_upload(request: Request, config: dict) -> Tuple[Dict[str, Any], int]:
         logger.info(f"Successfully uploaded {len(saved_files)} files to {len(set(f.split('/')[0] for f in saved_files))} batch directories")
         
         response_data = {
-            "message": f"{len(saved_files)} files uploaded successfully",
-            "files": saved_files,
-            "upload_folder": str(upload_folder)
+            "message": f"{len(saved_files)} files uploaded successfully"
         }
         
         if invalid_files:

@@ -1,7 +1,6 @@
 """Flask application factory for the MindPulse Endpoint POC."""
 
 import logging
-import os
 from typing import Optional
 from flask import Flask
 

@@ -6,6 +6,7 @@ A proof-of-concept Flask application for handling Android screenshot uploads. Th
 
 - **File Upload Endpoint**: Accepts multiple files via POST requests
 - **Local Storage**: Stores uploaded files in a configurable local directory
+- **Batch Processor**: Processes encrypted files with AES decryption, MIME type detection, and rsync
 - **Simple & Fast**: No file validation or verification - just saves files
 - **Configuration Management**: Environment-based configuration with multiple profiles
 - **Health Check**: Built-in health check endpoint
@@ -58,6 +59,8 @@ The application uses environment variables for configuration. Copy `env.example`
 - `SECRET_KEY`: Flask secret key (required in production)
 - `UPLOAD_FOLDER`: Directory to store uploaded files (default: `/tmp/mindpulse_uploads`)
 - `MAX_CONTENT_LENGTH`: Maximum file size in bytes (default: 16MB)
+- `KEYS_DIR`: Directory containing AES key files in hex format (default: `/etc/mindpulse/keys`)
+- `RSYNC_DEST_BASE`: Base rsync destination for processed files (default: `user@remote-server:/path/to/destination`)
 
 ## API Endpoints
 
@@ -82,9 +85,7 @@ curl -X POST http://localhost:5000/api/v1/upload \
 **Response:**
 ```json
 {
-  "message": "2 files uploaded successfully",
-  "files": ["screenshot1.png", "screenshot2.jpg"],
-  "upload_folder": "/tmp/mindpulse_uploads"
+  "message": "2 files uploaded successfully"
 }
 ```
 
@@ -174,3 +175,52 @@ gunicorn -w 4 -b 0.0.0.0:5000 "main:app"
 ## License
 
 [Add your license information here]
+
+## Batch Processor
+
+The application includes a batch processor script (`processor_example.py`) that handles encrypted files:
+
+### Features
+
+- **AES Decryption**: Decrypts files using subject-specific AES keys
+- **MIME Type Detection**: Uses the `file` command to determine correct file types
+- **Extension Correction**: Fixes incorrect file extensions based on actual content
+- **Rsync Integration**: Transfers processed files to remote destinations
+- **Batch Processing**: Processes entire directories atomically
+- **Error Handling**: Moves failed batches to a separate directory
+
+### Running the Processor
+
+```bash
+# Run with default configuration
+python processor_example.py
+
+# Run with specific configuration
+python processor_example.py production
+```
+
+### Processor Workflow
+
+1. **Watch for Batches**: Monitors the upload directory for new batch directories
+2. **Move to Processing**: Atomically moves batches to prevent race conditions
+3. **Decrypt Files**: Uses AES-256-CBC to decrypt each file
+4. **Detect MIME Type**: Uses the `file` command to determine actual file type
+5. **Correct Extensions**: Renames files with correct extensions based on content
+6. **Rsync to Remote**: Transfers files to the configured remote destination
+7. **Cleanup**: Moves batch to "processed" or "failed" directory
+
+### Key Requirements
+
+- **AES Keys**: Keys must be stored as hex files in `KEYS_DIR` with filenames matching subject hashes
+- **Linux Environment**: Requires the `file` command for MIME type detection
+- **Rsync Access**: Must have SSH access to the remote destination
+- **File Permissions**: Must have read/write access to all directories
+
+### Example Key File Structure
+
+```
+/etc/mindpulse/keys/
+├── 12345678.key  # Hex-encoded AES key for subject 12345678
+├── abcdef12.key  # Hex-encoded AES key for subject abcdef12
+└── ...
+```

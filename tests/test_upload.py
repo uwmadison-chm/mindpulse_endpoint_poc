@@ -1,13 +1,8 @@
 """Tests for the upload endpoint."""
 
-import tempfile
-import os
-from pathlib import Path
 from io import BytesIO
-from unittest.mock import patch
 
 import pytest
-from flask import Flask
 
 from mindpulse_endpoint_poc.app import create_app
 from mindpulse_endpoint_poc.utils import parse_size_string
@@ -90,9 +85,7 @@ def test_upload_single_file(client):
     assert response.status_code == 201
     data = response.get_json()
     assert "message" in data
-    assert "files" in data
-    assert len(data["files"]) == 1
-    assert data["files"][0] == "12345678/12345678_1750890839000.png"
+    assert "1 files uploaded successfully" in data["message"]
 
 
 def test_upload_invalid_filename_format(client):
@@ -124,8 +117,7 @@ def test_upload_multiple_files_same_batch(client):
     
     assert response.status_code == 201
     data = response.get_json()
-    assert len(data["files"]) == 2
-    assert all(f.startswith("12345678/") for f in data["files"])
+    assert "2 files uploaded successfully" in data["message"]
 
 
 def test_upload_multiple_batches(client):
@@ -143,9 +135,7 @@ def test_upload_multiple_batches(client):
     
     assert response.status_code == 201
     data = response.get_json()
-    assert len(data["files"]) == 2
-    assert "12345678/12345678_1750890839000.png" in data["files"]
-    assert "87654321/87654321_1750890853000.jpg" in data["files"]
+    assert "2 files uploaded successfully" in data["message"]
 
 
 def test_upload_method_not_allowed(client):
