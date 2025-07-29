@@ -46,10 +46,13 @@ def save_files_to_batch_directory(files: List, upload_path: Path) -> Tuple[List[
     
     # Create incoming directory
     incoming_dir = upload_path / "incoming"
+    ready_dir = upload_path / "ready"
+    
     ensure_directory_exists(incoming_dir)
+    ensure_directory_exists(ready_dir)
     
     # Group files by subject_hash
-    batch_directories: Dict[str, List] = {}
+    batch_dirs = []
     
     for filenum, file in files.items():
         safe_filename = secure_filename(file.filename)
@@ -63,12 +66,20 @@ def save_files_to_batch_directory(files: List, upload_path: Path) -> Tuple[List[
         
         # Create batch directory if it doesn't exist
         batch_dir = incoming_dir / subject_hash / timestamp
+        batch_dirs.append(batch_dir)
         ensure_directory_exists(batch_dir)
         target = batch_dir / safe_filename
         file.save(target)
         logger.info(f"Saved {target}")
         saved_files.append(target)
-                
+    
+    for bdir in batch_dirs:
+        bname = bdir.name
+        dest = ready_dir / bname
+        
+        result = bdir.rename(dest)
+        logger.debug(f"{bname} -> {result}")
+        
     return saved_files, invalid_files
 
 
