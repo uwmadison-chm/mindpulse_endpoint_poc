@@ -95,3 +95,6 @@ def initialize_state(config: dict) -> None:
     upload_path = Path(config['UPLOAD_PATH'])
     upload_path.mkdir(exist_ok=True, parents=True)
     config['UPLOAD_PATH'] = upload_path
+
+
+app = create_app()
