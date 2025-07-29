@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 from flask import Request
+from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from .utils import ensure_directory_exists
@@ -13,47 +14,29 @@ from .utils import ensure_directory_exists
 logger = logging.getLogger(__name__)
 
 
-def parse_filename(filename: str) -> Tuple[str, str, str]:
+def parse_filename(filename: str) -> Tuple[str, str, str, str]:
     """
     Parse filename to extract subject_hash, timestamp, and extension.
     
-    Expected format: {subject_hash}_{timestamp}.{ext}
+    Expected format: {subject_hash}_{timestamp}_{type}.{ext}
     subject_hash: 8 hex digits
     timestamp: epoch time with millisecond precision
     
     Returns:
-        Tuple of (subject_hash, timestamp, extension) or (None, None, None) if invalid
+        Tuple of (subject_hash, timestamp, type, extension)
     """
-    pattern = r'^([a-fA-F0-9]{8})_(\d+)\.(.+)$'
-    match = re.match(pattern, filename)
-    
-    if match:
-        subject_hash, timestamp, extension = match.groups()
-        return subject_hash, timestamp, extension
-    else:
-        return None, None, None
+    ppt_hash, epochtime, typeext = filename.split("_")
+    type, ext = typeext.split(".")
+    return ppt_hash, epochtime, type, ext
 
 
-def collect_files(request: Request) -> List:
-    """
-    Collect all files from the request, regardless of key.
-    
-    Args:
-        request: Flask request object
-        
-    Returns:
-        List of file objects
-    """
-    return list(request.files.values())
-
-
-def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[List[str], List[str]]:
+def save_files_to_batch_directory(files: List, upload_path: Path) -> Tuple[List[str], List[str]]:
     """
     Save files to batch directories organized by subject_hash in the incoming directory.
     
     Args:
         files: List of file objects
-        upload_folder: Base directory to save files to (as Path)
+        upload_path: Base directory to save files to (as Path)
         
     Returns:
         Tuple of (saved_filenames, invalid_filenames)
@@ -62,49 +45,30 @@ def save_files_to_batch_directory(files: List, upload_folder: Path) -> Tuple[Lis
     invalid_files: List[str] = []
     
     # Create incoming directory
-    incoming_dir = upload_folder / "incoming"
-    ensure_directory_exists(str(incoming_dir))
+    incoming_dir = upload_path / "incoming"
+    ensure_directory_exists(incoming_dir)
     
     # Group files by subject_hash
     batch_directories: Dict[str, List] = {}
     
-    for file in files:
-        original_filename = file.filename
-        subject_hash, timestamp, extension = parse_filename(original_filename)
-        
-        if subject_hash is None:
-            logger.warning(f"Invalid filename format: {original_filename}")
-            invalid_files.append(original_filename)
+    for filenum, file in files.items():
+        safe_filename = secure_filename(file.filename)
+        logger.debug(f"Processing {filenum}: {safe_filename}")
+        try:
+            subject_hash, timestamp, type, extension = parse_filename(safe_filename)
+        except Exception as e:
+            logger.warning(f"Error parsing file {filenum}: {safe_filename}")
+            invalid_files.append(f"{filenum}: {safe_filename}")
             continue
         
         # Create batch directory if it doesn't exist
-        batch_dir = incoming_dir / subject_hash
-        if subject_hash not in batch_directories:
-            batch_directories[subject_hash] = []
-            ensure_directory_exists(str(batch_dir))
-        
-        batch_directories[subject_hash].append((file, original_filename))
-    
-    # Save files to their respective batch directories
-    for subject_hash, file_list in batch_directories.items():
-        batch_dir = incoming_dir / subject_hash
-        
-        for file, original_filename in file_list:
-            # Use original filename as-is (it's already properly formatted)
-            file_path = batch_dir / original_filename
-            
-            # Handle filename conflicts by adding timestamp if needed
-            if file_path.exists():
-                name, ext = original_filename.rsplit('.', 1)
-                timestamp = str(int(time.time() * 1000))
-                unique_filename = f"{name}_{timestamp}.{ext}"
-                file_path = batch_dir / unique_filename
-                logger.info(f"Filename conflict resolved: {original_filename} -> {unique_filename}")
-            
-            file.save(str(file_path))
-            saved_files.append(f"incoming/{subject_hash}/{original_filename}")
-            logger.info(f"Saved file: incoming/{subject_hash}/{original_filename}")
-    
+        batch_dir = incoming_dir / subject_hash / timestamp
+        ensure_directory_exists(batch_dir)
+        target = batch_dir / safe_filename
+        file.save(target)
+        logger.info(f"Saved {target}")
+        saved_files.append(target)
+                
     return saved_files, invalid_files
 
 
@@ -119,40 +83,26 @@ def handle_upload(request: Request, config: dict) -> Tuple[Dict[str, Any], int]:
     Returns:
         JSON-serializable dict and HTTP status code
     """
-    try:
-        upload_folder = config.get("UPLOAD_FOLDER", Path("/tmp/mindpulse_uploads"))
-        
-        # Ensure upload directory exists
-        ensure_directory_exists(str(upload_folder))
-        
-        # Collect files
-        files = collect_files(request)
-        
-        if not files:
-            return {"error": "No files found in request"}, 400
-        
-        # Save files to batch directories
-        saved_files, invalid_files = save_files_to_batch_directory(files, upload_folder)
-        
-        if not saved_files:
-            return {"error": "No valid files found in request"}, 400
-        
-        logger.info(f"Successfully uploaded {len(saved_files)} files to {len(set(f.split('/')[0] for f in saved_files))} batch directories")
-        
-        response_data = {
-            "message": f"{len(saved_files)} files uploaded successfully"
-        }
-        
-        if invalid_files:
-            response_data["invalid_files"] = invalid_files
-            response_data["message"] += f" ({len(invalid_files)} invalid files ignored)"
-        
-        return response_data, 201
+    upload_path = config["UPLOAD_PATH"]
+    
+    if not request.files:
+        return {"error": "No files found in request"}, 400
+    
+    # Save files to batch directories
+    saved_files, invalid_files = save_files_to_batch_directory(request.files, upload_path)
+    
+    if not saved_files:
+        return {"error": "No valid files found in request"}, 400
+    
+    logger.info(f"Successfully uploaded {len(saved_files)} files to {upload_path}")
+    
+    response_data = {
+        "message": f"{len(saved_files)} files uploaded successfully"
+    }
+    
+    if invalid_files:
+        response_data["invalid_files"] = invalid_files
+        response_data["message"] += f" ({len(invalid_files)} invalid files ignored)"
+    
+    return response_data, 201
 
-    except RequestEntityTooLarge:
-        logger.error("Request entity too large")
-        return {"error": "File size exceeds maximum allowed size"}, 413
-
-    except Exception as e:
-        logger.error(f"Unexpected error during upload: {e}")
-        return {"error": "Internal server error"}, 500 

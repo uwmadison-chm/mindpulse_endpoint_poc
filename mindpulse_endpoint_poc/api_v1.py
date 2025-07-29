@@ -36,4 +36,8 @@ def register_api_v1_routes(app):
         Returns:
             JSON response indicating service health
         """
-        return {"status": "healthy", "service": "mindpulse-endpoint-poc", "version": "v1"}, 200 
+        status_dict = {"status": "healthy", "service": "mindpulse-endpoint-poc", "version": "v1"}
+        if app.debug:
+            config_dict = {k: str(v) for k, v in app.config.items()}
+            status_dict['config_strings'] = config_dict
+        return status_dict, 200

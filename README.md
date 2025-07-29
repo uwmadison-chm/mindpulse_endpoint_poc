@@ -56,11 +56,11 @@ The application uses environment variables for configuration. Copy `env.example`
 - `FLASK_DEBUG`: Enable debug mode (`true`/`false`)
 - `FLASK_HOST`: Host to bind to (default: `0.0.0.0`)
 - `FLASK_PORT`: Port to bind to (default: `5000`)
-- `SECRET_KEY`: Flask secret key (required in production)
-- `UPLOAD_FOLDER`: Directory to store uploaded files (default: `/tmp/mindpulse_uploads`)
-- `MAX_CONTENT_LENGTH`: Maximum file size in bytes (default: 16MB)
-- `KEYS_DIR`: Directory containing AES key files in hex format (default: `/etc/mindpulse/keys`)
-- `RSYNC_DEST_BASE`: Base rsync destination for processed files (default: `user@remote-server:/path/to/destination`)
+- `MINDPULSE_SECRET_KEY`: Flask secret key (required in production)
+- `MINDPULSE_UPLOAD_DIR`: Directory to store uploaded files (default: `/tmp/mindpulse_uploads`)
+- `MINDPULSE_MAX_CONTENT_LENGTH`: Maximum file size in bytes (default: 16MB)
+- `MINDPULSE_KEYS_DIR`: Directory containing AES key files in hex format (default: `/etc/mindpulse/keys`)
+- `MINDPULSE_RSYNC_DEST_BASE`: Base rsync destination for processed files (default: `user@remote-server:/path/to/destination`)
 
 ## API Endpoints
 
@@ -73,7 +73,7 @@ Uploads multiple files from Android devices.
 - Content-Type: `multipart/form-data`
 - Files must be named according to the pattern "{subject_hash}_{timestamp}.{ext}" -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an epoch time with millisecond precision. {ext} will generally, but not necessarily, be an image extension
 - Files not matching this pattern will be logged but not saved.
-- Files in a batch should have the same subject_hash but it's not a problem if they don't
+- Files in a batch will generally have the same subject_hash but it's not a problem if they don't
 
 **Example using curl:**
 ```bash
