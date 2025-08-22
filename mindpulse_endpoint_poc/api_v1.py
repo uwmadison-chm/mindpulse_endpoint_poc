@@ -6,7 +6,6 @@ from flask import request, current_app
 
 from .services import handle_upload
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 

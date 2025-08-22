@@ -8,3 +8,5 @@ UPLOAD_PATH = "/tmp/mindpulse_uploads"
 
 # Parse MAX_CONTENT_LENGTH from human-readable string
 MAX_CONTENT_LENGTH = "16M"
+
+KEYS_PATH = "/tmp/mindpulse_keys"
