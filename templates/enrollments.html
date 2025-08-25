@@ -1,13 +1,17 @@
-<!doctype html>
+{% extends 'base.html' %}
 
-<html>
-    <head>
-        <title>Add an enrollment</title>
-    </head>
-    <body>
-        <p>This is where enrollment live</p>
-        <form method="POST" action="{{ url_for('create_enrollment') }}">
-            <button type="submit">Create a new enrollment</button>
-        </form>
-    </body>
-</html>
+{% block title %}Enrollments {% endblock %}
+
+{% block content %}
+<h1>MindPulse Enrollments</h1>
+<form method="POST" action="{{ url_for('create_enrollment') }}">
+    <button type="submit">Create a new enrollment</button>
+</form>
+
+<form method="GET" action="{{ url_for('search_enrollments') }}">
+    <h3><label for="search">Lookup by short code or key</label></h3>
+    <input name="q" type="search" id="search" placeholder="Examples: dd03cfb5, 7815c34992fd802d756cc5040c731ca82fb44f2dce9ac1df99a7dd829b69fc54" size="80">
+    <button type="submit">Search</button>
+</form>
+    
+{% endblock %}

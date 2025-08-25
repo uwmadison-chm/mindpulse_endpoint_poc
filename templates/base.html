@@ -1,0 +1,30 @@
+<!doctype html>
+
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+        {% block title %}{% endblock %}
+        • MindPulse
+        </title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    </head>
+    <body>
+        <section id="main">
+            {% block content %}{% endblock %}
+        </section>
+        <section id="flash">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <ul>
+            {% for message in messages %}
+                <li>{{message}}</li>
+            {% endfor %}
+            </ul>
+            {% endif %}
+            {% endwith %}
+        </section>
+    <script src="{{ url_for('static', filename='script.js')}} "></script>
+    </body>
+</html>
