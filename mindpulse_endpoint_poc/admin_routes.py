@@ -18,10 +18,12 @@ def register(app):
         return render_template('enrollments.html')
 
 
-    @app.get("/enrollments/<key>")
-    def show_enrollment(key):
-        return ''
-
+    @app.get("/enrollments/<full_key>")
+    def show_enrollment(full_key):
+        keys_path = app.config['KEYS_PATH']
+        key = enrollment_key.EnrollmentKey.load_for_search_str(keys_path, full_key)
+        app.logger.info(f"show_enrollment loaded {key}")
+        return render_template("show_enrollment.html", key=key)
     
     @app.get("/enrollments/search")
     def search_enrollments():
@@ -33,7 +35,7 @@ def register(app):
                 request.args.get('q', '')
             )
             app.logger.info(key)
-            return redirect(url_for('show_enrollment', key=key.hexdata))
+            return redirect(url_for('show_enrollment', full_key=key.hexdata))
         except Exception as e:
             flash('Enrollment not found')
             app.logger.error(e)
@@ -44,5 +46,5 @@ def register(app):
     def create_enrollment():
         k = enrollment_key.EnrollmentKey.generate_and_persist_random(app.config['KEYS_PATH'])
         app.logger.debug(f"Generated key {k.hexdata} with short_sha {k.short_sha}")
-        return redirect(url_for('enrollments_form'))
+        return redirect(url_for('show_enrollment', full_key=k.hexdata))
 

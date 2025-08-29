@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Enrollments{% endblock %}
+
+{% block content %}
+
+<div id="qrcode"></div>
+
+<div id="meta">
+<div id="key">{{ key.hexdata }}</div>
+<div id="short_sha">{{ key.short_sha }}</div>
+<button type="button" id="copier">Copy</button>
+</div>
+
+<div>
+    <a href="{{ url_for('enrollments_form') }}">Add or search for another</a>
+</div>
+{% endblock %}
