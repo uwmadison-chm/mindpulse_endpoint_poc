@@ -6,10 +6,12 @@ import logging
 import re
 
 from flask import url_for, redirect, render_template, request, flash
+from flask_oidc import OpenIDConnect
 
 from .models import enrollment_key
 
 def register(app):
+    oidc = OpenIDConnect(app)
     enrollment_key.logger = app.logger
     app.logger.debug("Registering admin routes...")
     
