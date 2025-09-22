@@ -14,20 +14,45 @@ from .utils import ensure_directory_exists
 logger = logging.getLogger(__name__)
 
 
-def parse_filename(filename: str) -> Tuple[str, str, str, str]:
+def parse_filename(filename: str) -> Tuple[str, str, str, str, str]:
     """
-    Parse filename to extract subject_hash, timestamp, and extension.
-    
-    Expected format: {subject_hash}_{timestamp}_{type}.{ext}
-    subject_hash: 8 hex digits
-    timestamp: epoch time with millisecond precision
-    
+    Parse filename to extract components.
+
+    Supports two formats:
+    1. New format: {short_hash}_{timestamp}_{type}_{iv}.{ext}
+    2. Legacy format: {subject_hash}_{timestamp}_{type}.{ext}
+
+    short_hash: 8 hex digits identifying the enrollment key
+    timestamp: ISO 8601 format with timezone or epoch time
+    type: data type (e.g., screenshot, gps)
+    iv: 24 hex digits (12 bytes) for encryption IV (new format only)
+
     Returns:
-        Tuple of (subject_hash, timestamp, type, extension)
+        Tuple of (subject_hash, timestamp, type, iv, extension)
+        For legacy format, iv will be empty string
     """
-    ppt_hash, epochtime, typeext = filename.split("_")
-    type, ext = typeext.split(".")
-    return ppt_hash, epochtime, type, ext
+    name_without_ext, ext = filename.rsplit(".", 1)
+    parts = name_without_ext.split("_")
+
+    if len(parts) == 4:
+        # New format: short_hash_timestamp_type_iv.ext
+        short_hash, timestamp, type_str, iv = parts
+
+        # Validate short_hash (8 hex chars)
+        if len(short_hash) != 8 or not re.match(r'^[0-9a-f]{8}$', short_hash.lower()):
+            raise ValueError(f"Invalid short_hash: expected 8 hex chars, got '{short_hash}'")
+
+        # Validate IV (24 hex chars = 12 bytes)
+        if len(iv) != 24 or not re.match(r'^[0-9a-f]{24}$', iv.lower()):
+            raise ValueError(f"Invalid IV: expected 24 hex chars, got '{iv}'")
+
+        return short_hash, timestamp, type_str, iv, ext
+    elif len(parts) == 3:
+        # Legacy format: subject_hash_timestamp_type.ext
+        subject_hash, timestamp, type_str = parts
+        return subject_hash, timestamp, type_str, "", ext
+    else:
+        raise ValueError(f"Invalid filename format: {filename}")
 
 
 def save_files_to_batch_directory(files: List, upload_path: Path) -> Tuple[List[str], List[str]]:
@@ -58,9 +83,9 @@ def save_files_to_batch_directory(files: List, upload_path: Path) -> Tuple[List[
         safe_filename = secure_filename(file.filename)
         logger.debug(f"Processing {filenum}: {safe_filename}")
         try:
-            subject_hash, timestamp, type, extension = parse_filename(safe_filename)
+            subject_hash, timestamp, type_str, iv, extension = parse_filename(safe_filename)
         except Exception as e:
-            logger.warning(f"Error parsing file {filenum}: {safe_filename}")
+            logger.warning(f"Error parsing file {filenum}: {safe_filename}: {e}")
             invalid_files.append(f"{filenum}: {safe_filename}")
             continue
         

@@ -28,6 +28,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 # Import the same config system as the Flask app
 from mindpulse_endpoint_poc.config import get_config
+from mindpulse_endpoint_poc.services import parse_filename
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -98,30 +99,41 @@ class BatchProcessor:
             logger.error(f"Failed to read key file {key_file}: {e}")
             return None
     
-    def decrypt_file(self, encrypted_file: Path, key: bytes) -> Optional[bytes]:
-        """Decrypt a file using AES-256-CBC."""
+    def decrypt_file(self, encrypted_file: Path, key: bytes, iv: Optional[bytes] = None) -> Optional[bytes]:
+        """
+        Decrypt a file using AES-256-CBC.
+
+        Args:
+            encrypted_file: Path to encrypted file
+            key: AES key bytes
+            iv: Optional IV bytes. If None, extracts from first 16 bytes of file (legacy)
+        """
         try:
             with open(encrypted_file, 'rb') as f:
                 encrypted_data = f.read()
-            
-            # Extract IV (first 16 bytes) and ciphertext
-            iv = encrypted_data[:16]
-            ciphertext = encrypted_data[16:]
-            
+
+            if iv is not None:
+                # New format: IV provided from filename, file contains only ciphertext
+                ciphertext = encrypted_data
+            else:
+                # Legacy format: IV is first 16 bytes of file
+                iv = encrypted_data[:16]
+                ciphertext = encrypted_data[16:]
+
             # Create cipher
             cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
             decryptor = cipher.decryptor()
-            
+
             # Decrypt
             decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
-            
+
             # Remove PKCS7 padding
             padding_length = decrypted_data[-1]
             if padding_length < 16:
                 decrypted_data = decrypted_data[:-padding_length]
-            
+
             return decrypted_data
-            
+
         except Exception as e:
             logger.error(f"Failed to decrypt {encrypted_file}: {e}")
             return None
@@ -207,9 +219,19 @@ class BatchProcessor:
             if file_path.is_file():
                 try:
                     logger.info(f"Processing {file_path.name}")
-                    
+
+                    # Parse filename to extract IV if present
+                    iv_bytes = None
+                    try:
+                        _, _, _, iv_hex, _ = parse_filename(file_path.name)
+                        if iv_hex:  # New format with IV in filename
+                            iv_bytes = bytes.fromhex(iv_hex)
+                            logger.debug(f"Extracted IV from filename: {iv_hex}")
+                    except Exception as e:
+                        logger.debug(f"Using legacy format for {file_path.name}: {e}")
+
                     # 1. Decrypt the file
-                    decrypted_data = self.decrypt_file(file_path, key)
+                    decrypted_data = self.decrypt_file(file_path, key, iv_bytes)
                     if decrypted_data is None:
                         results["files_failed"] += 1
                         results["errors"].append(f"Failed to decrypt {file_path.name}")

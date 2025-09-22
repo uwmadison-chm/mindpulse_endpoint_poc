@@ -1,6 +1,8 @@
 """Utility functions for the MindPulse Endpoint POC."""
 
 import re
+import secrets
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from werkzeug.utils import secure_filename
@@ -52,8 +54,68 @@ def parse_size_string(size_str: str) -> int:
 def ensure_directory_exists(directory_path: Path) -> None:
     """
     Ensure a directory exists, creating it if necessary.
-    
+
     Args:
         directory_path: Path to the directory to ensure exists
     """
     Path(directory_path).mkdir(parents=True, exist_ok=True)
+
+
+def generate_iv() -> bytes:
+    """
+    Generate a random 12-byte IV for AES encryption.
+
+    Returns:
+        12 random bytes suitable for use as AES IV
+    """
+    return secrets.token_bytes(12)
+
+
+def generate_filename(short_hash: str, data_type: str, extension: str,
+                     timestamp: Optional[str] = None, iv: Optional[bytes] = None) -> str:
+    """
+    Generate a filename using the new format with IV.
+
+    Format: {short_hash}_{timestamp}_{type}_{iv}.{ext}
+
+    Args:
+        short_hash: 8 hex character enrollment key identifier
+        data_type: Type of data (e.g., 'screenshot', 'gps')
+        extension: File extension without dot (e.g., 'png', 'json')
+        timestamp: Optional ISO 8601 timestamp. If None, uses current time
+        iv: Optional IV bytes. If None, generates random IV
+
+    Returns:
+        Filename string in new format
+    """
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+
+    if iv is None:
+        iv = generate_iv()
+
+    iv_hex = iv.hex()
+
+    return f"{short_hash}_{timestamp}_{data_type}_{iv_hex}.{extension}"
+
+
+def validate_filename_format(filename: str) -> bool:
+    """
+    Validate if filename matches expected format.
+
+    Supports both new and legacy formats:
+    - New: {short_hash}_{timestamp}_{type}_{iv}.{ext}
+    - Legacy: {subject_hash}_{timestamp}_{type}.{ext}
+
+    Args:
+        filename: Filename to validate
+
+    Returns:
+        True if filename matches a valid format
+    """
+    try:
+        from .services import parse_filename
+        parse_filename(filename)
+        return True
+    except (ValueError, ImportError):
+        return False
