@@ -119,3 +119,108 @@ def validate_filename_format(filename: str) -> bool:
         return True
     except (ValueError, ImportError):
         return False
+
+
+def extract_date_from_timestamp(timestamp: str) -> str:
+    """
+    Extract date in YYYY-MM-DD format from timestamp.
+
+    Handles both ISO 8601 and epoch timestamp formats.
+
+    Args:
+        timestamp: Timestamp string (ISO 8601 or epoch)
+
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    import re
+    from datetime import datetime
+
+    # Try ISO 8601 format first
+    iso_match = re.match(r'^(\d{4}-\d{2}-\d{2})', timestamp)
+    if iso_match:
+        return iso_match.group(1)
+
+    # Try epoch timestamp (milliseconds)
+    try:
+        # Handle both seconds and milliseconds
+        if len(timestamp) > 10:  # Milliseconds
+            epoch_time = int(timestamp) / 1000
+        else:  # Seconds
+            epoch_time = int(timestamp)
+
+        dt = datetime.fromtimestamp(epoch_time)
+        return dt.strftime('%Y-%m-%d')
+    except (ValueError, OverflowError):
+        # Fallback: use current date
+        return datetime.now().strftime('%Y-%m-%d')
+
+
+def get_file_type_category(mime_type: str, extension: str, filename_type: str = "") -> str:
+    """
+    Categorize file into type directory based primarily on filename type.
+
+    Args:
+        mime_type: MIME type of the file
+        extension: File extension
+        filename_type: Type from filename (e.g., 'screenshot', 'gps', 'metadata')
+
+    Returns:
+        Directory category name (uses filename type directly when possible)
+    """
+    # Use filename type directly as the primary organization method
+    if filename_type and filename_type.strip():
+        # Clean the type string and use it as directory name
+        clean_type = filename_type.lower().strip()
+
+        # Only use it if it's a reasonable directory name (alphanumeric + underscore)
+        import re
+        if re.match(r'^[a-z0-9_]+$', clean_type):
+            return clean_type
+
+    # Fallback to MIME type categorization only if filename type is missing/invalid
+    if mime_type:
+        main_type = mime_type.split('/')[0].lower()
+        if main_type == 'image':
+            return 'images'
+        elif main_type == 'audio':
+            return 'audio'
+        elif main_type == 'video':
+            return 'video'
+        elif mime_type in ['application/json', 'text/json']:
+            return 'data'
+
+    # Final fallback to extension
+    extension = extension.lower().lstrip('.')
+    if extension in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff']:
+        return 'images'
+    elif extension in ['mp3', 'wav', 'ogg', 'flac', 'm4a']:
+        return 'audio'
+    elif extension in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
+        return 'video'
+    elif extension in ['json', 'csv', 'txt']:
+        return 'data'
+
+    # Default category
+    return 'other'
+
+
+def build_organized_path(subject_id: str, timestamp: str, file_type: str,
+                        mime_type: str = "", extension: str = "") -> str:
+    """
+    Build organized file path: ID/date/type/
+
+    Args:
+        subject_id: Subject/participant ID
+        timestamp: Timestamp from filename
+        file_type: Type from filename
+        mime_type: MIME type of file
+        extension: File extension
+
+    Returns:
+        Relative path string (e.g., "b27954ea/2025-09-19/images/")
+    """
+    date = extract_date_from_timestamp(timestamp)
+    category = get_file_type_category(mime_type, extension, file_type)
+
+    return f"{subject_id}/{date}/{category}/"

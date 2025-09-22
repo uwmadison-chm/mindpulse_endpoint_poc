@@ -29,6 +29,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 # Import the same config system as the Flask app
 from mindpulse_endpoint_poc.config import get_config
 from mindpulse_endpoint_poc.services import parse_filename
+from mindpulse_endpoint_poc.utils import build_organized_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -220,15 +221,25 @@ class BatchProcessor:
                 try:
                     logger.info(f"Processing {file_path.name}")
 
-                    # Parse filename to extract IV if present
+                    # Parse filename to extract components
                     iv_bytes = None
+                    subject_id = None
+                    timestamp = None
+                    file_type = None
+                    original_ext = None
+
                     try:
-                        _, _, _, iv_hex, _ = parse_filename(file_path.name)
+                        subject_id, timestamp, file_type, iv_hex, original_ext = parse_filename(file_path.name)
                         if iv_hex:  # New format with IV in filename
                             iv_bytes = bytes.fromhex(iv_hex)
                             logger.debug(f"Extracted IV from filename: {iv_hex}")
                     except Exception as e:
                         logger.debug(f"Using legacy format for {file_path.name}: {e}")
+                        # Fallback: use subject_hash as ID if parsing fails
+                        subject_id = subject_hash
+                        timestamp = "unknown"
+                        file_type = "unknown"
+                        original_ext = file_path.suffix.lstrip('.')
 
                     # 1. Decrypt the file
                     decrypted_data = self.decrypt_file(file_path, key, iv_bytes)
@@ -258,11 +269,18 @@ class BatchProcessor:
                         temp_file.rename(corrected_file)
                         logger.info(f"Corrected extension for {file_path.name}: {corrected_file.name}")
                     
-                    # 5. Rsync to remote destination
-                    remote_dest = f"{self.rsync_dest_base}/{subject_hash}/"
+                    # 5. Build organized destination path
+                    organized_path = build_organized_path(
+                        subject_id, timestamp, file_type, mime_type, correct_ext
+                    )
+                    remote_dest = f"{self.rsync_dest_base}/{organized_path}"
+
+                    logger.info(f"Organized destination: {remote_dest}")
+
+                    # 6. Rsync to organized remote destination
                     if self.rsync_file(corrected_file, remote_dest):
                         results["files_processed"] += 1
-                        logger.info(f"Successfully processed {file_path.name} -> {corrected_file.name}")
+                        logger.info(f"Successfully processed {file_path.name} -> {organized_path}{corrected_file.name}")
                     else:
                         results["files_failed"] += 1
                         results["errors"].append(f"Failed to rsync {file_path.name}")
