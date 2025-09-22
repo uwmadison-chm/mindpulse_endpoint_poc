@@ -28,6 +28,8 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 # Import the same config system as the Flask app
 from mindpulse_endpoint_poc.config import get_config
+from mindpulse_endpoint_poc.services import parse_filename
+from mindpulse_endpoint_poc.utils import build_organized_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -98,30 +100,41 @@ class BatchProcessor:
             logger.error(f"Failed to read key file {key_file}: {e}")
             return None
     
-    def decrypt_file(self, encrypted_file: Path, key: bytes) -> Optional[bytes]:
-        """Decrypt a file using AES-256-CBC."""
+    def decrypt_file(self, encrypted_file: Path, key: bytes, iv: Optional[bytes] = None) -> Optional[bytes]:
+        """
+        Decrypt a file using AES-256-CBC.
+
+        Args:
+            encrypted_file: Path to encrypted file
+            key: AES key bytes
+            iv: Optional IV bytes. If None, extracts from first 16 bytes of file (legacy)
+        """
         try:
             with open(encrypted_file, 'rb') as f:
                 encrypted_data = f.read()
-            
-            # Extract IV (first 16 bytes) and ciphertext
-            iv = encrypted_data[:16]
-            ciphertext = encrypted_data[16:]
-            
+
+            if iv is not None:
+                # New format: IV provided from filename, file contains only ciphertext
+                ciphertext = encrypted_data
+            else:
+                # Legacy format: IV is first 16 bytes of file
+                iv = encrypted_data[:16]
+                ciphertext = encrypted_data[16:]
+
             # Create cipher
             cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
             decryptor = cipher.decryptor()
-            
+
             # Decrypt
             decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
-            
+
             # Remove PKCS7 padding
             padding_length = decrypted_data[-1]
             if padding_length < 16:
                 decrypted_data = decrypted_data[:-padding_length]
-            
+
             return decrypted_data
-            
+
         except Exception as e:
             logger.error(f"Failed to decrypt {encrypted_file}: {e}")
             return None
@@ -207,9 +220,29 @@ class BatchProcessor:
             if file_path.is_file():
                 try:
                     logger.info(f"Processing {file_path.name}")
-                    
+
+                    # Parse filename to extract components
+                    iv_bytes = None
+                    subject_id = None
+                    timestamp = None
+                    file_type = None
+                    original_ext = None
+
+                    try:
+                        subject_id, timestamp, file_type, iv_hex, original_ext = parse_filename(file_path.name)
+                        if iv_hex:  # New format with IV in filename
+                            iv_bytes = bytes.fromhex(iv_hex)
+                            logger.debug(f"Extracted IV from filename: {iv_hex}")
+                    except Exception as e:
+                        logger.debug(f"Using legacy format for {file_path.name}: {e}")
+                        # Fallback: use subject_hash as ID if parsing fails
+                        subject_id = subject_hash
+                        timestamp = "unknown"
+                        file_type = "unknown"
+                        original_ext = file_path.suffix.lstrip('.')
+
                     # 1. Decrypt the file
-                    decrypted_data = self.decrypt_file(file_path, key)
+                    decrypted_data = self.decrypt_file(file_path, key, iv_bytes)
                     if decrypted_data is None:
                         results["files_failed"] += 1
                         results["errors"].append(f"Failed to decrypt {file_path.name}")
@@ -236,11 +269,18 @@ class BatchProcessor:
                         temp_file.rename(corrected_file)
                         logger.info(f"Corrected extension for {file_path.name}: {corrected_file.name}")
                     
-                    # 5. Rsync to remote destination
-                    remote_dest = f"{self.rsync_dest_base}/{subject_hash}/"
+                    # 5. Build organized destination path
+                    organized_path = build_organized_path(
+                        subject_id, timestamp, file_type, mime_type, correct_ext
+                    )
+                    remote_dest = f"{self.rsync_dest_base}/{organized_path}"
+
+                    logger.info(f"Organized destination: {remote_dest}")
+
+                    # 6. Rsync to organized remote destination
                     if self.rsync_file(corrected_file, remote_dest):
                         results["files_processed"] += 1
-                        logger.info(f"Successfully processed {file_path.name} -> {corrected_file.name}")
+                        logger.info(f"Successfully processed {file_path.name} -> {organized_path}{corrected_file.name}")
                     else:
                         results["files_failed"] += 1
                         results["errors"].append(f"Failed to rsync {file_path.name}")
