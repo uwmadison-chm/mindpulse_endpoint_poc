@@ -11,3 +11,6 @@ MAX_CONTENT_LENGTH = "16M"
 
 KEYS_PATH = "/tmp/mindpulse_keys"
 
+OIDC_ENABLED = False
+
+OIDC_CLIENT_SECRETS = "/tmp/secrets"

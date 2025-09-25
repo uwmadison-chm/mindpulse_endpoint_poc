@@ -4,15 +4,14 @@ from io import BytesIO
 
 import pytest
 
-from mindpulse_endpoint_poc.app import create_app
+from app import create_app
 from mindpulse_endpoint_poc.utils import parse_size_string
-from mindpulse_endpoint_poc.services import parse_filename
 
 
 @pytest.fixture
 def app():
     """Create a test Flask application."""
-    app = create_app("testing")
+    app = create_app()
     return app
 
 
@@ -74,11 +73,12 @@ def test_upload_no_files(client):
 def test_upload_single_file(client):
     """Test upload endpoint with a single file."""
     # Create a mock image file with proper naming format
+    # Format: {short_id}_{created_at}_{type}_{iv}.ext
     image_data = b"fake image data"
-    
+
     response = client.post(
         "/api/v1/upload",
-        data={"file1": (BytesIO(image_data), "12345678_1750890839000.png")},
+        data={"file1": (BytesIO(image_data), "12345678_2025-09-25T12:00:00-05:00_image_f748062b37fcf5128420aa84201f0acb.png")},
         content_type="multipart/form-data"
     )
     
@@ -109,8 +109,8 @@ def test_upload_multiple_files_same_batch(client):
     response = client.post(
         "/api/v1/upload",
         data={
-            "file1": (BytesIO(image_data), "12345678_1750890839000.png"),
-            "file2": (BytesIO(image_data), "12345678_1750890853000.png"),
+            "file1": (BytesIO(image_data), "12345678_2025-09-25T12:00:00-05:00_image_f748062b37fcf5128420aa84201f0acb.png"),
+            "file2": (BytesIO(image_data), "12345678_2025-09-25T12:05:00-05:00_image_a1b2c3d4e5f6789012345678901234ab.png"),
         },
         content_type="multipart/form-data"
     )
@@ -127,8 +127,8 @@ def test_upload_multiple_batches(client):
     response = client.post(
         "/api/v1/upload",
         data={
-            "file1": (BytesIO(image_data), "12345678_1750890839000.png"),
-            "file2": (BytesIO(image_data), "87654321_1750890853000.jpg"),
+            "file1": (BytesIO(image_data), "12345678_2025-09-25T12:00:00-05:00_image_f748062b37fcf5128420aa84201f0acb.png"),
+            "file2": (BytesIO(image_data), "87654321_2025-09-25T12:05:00-05:00_image_a1b2c3d4e5f6789012345678901234ab.jpg"),
         },
         content_type="multipart/form-data"
     )

@@ -9,7 +9,6 @@ from flask import Flask
 from mindpulse_endpoint_poc import initial_settings
 from mindpulse_endpoint_poc.api_v1 import register_api_v1_routes
 from mindpulse_endpoint_poc import admin_routes
-from mindpulse_endpoint_poc import services  # Import to ensure module is loaded
 from mindpulse_endpoint_poc import utils
 
 def create_app() -> Flask:
@@ -98,11 +97,22 @@ def initialize_state(config: dict) -> None:
     upload_path = Path(config['UPLOAD_PATH'])
     upload_path.mkdir(exist_ok=True, parents=True)
     config['UPLOAD_PATH'] = upload_path
+    config['INCOMING_PATH'] = upload_path / 'incoming'
+    config['READY_PATH'] = upload_path / 'ready'
     
     config['KEYS_PATH_RAW'] = config['KEYS_PATH']
     keys_path = Path(config['KEYS_PATH'])
     keys_path.mkdir(exist_ok=True, parents=True)
     config['KEYS_PATH'] = keys_path
+
+
+def pathify(config: dict, key: str) -> None:
+    path_str = config[key]
+    path_path = Path(path_str)
+    path_path.mkdir(exist_ok=True, parents=True)
+    raw_key = f"{key}_RAW"
+    config[raw_key] = path_str
+    config[key] = path_path
 
 
 app = create_app()
