@@ -110,7 +110,7 @@ Health check endpoint.
 ### Running in Development Mode
 
 ```bash
-FLASK_ENV=development FLASK_DEBUG=true python main.py
+flask run --port 5001 --debug
 ```
 
 ### Running Tests
@@ -169,12 +169,10 @@ For production deployment:
 
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 "main:app"
+gunicorn -w 4 -b 127.0.0.1:5000 "main:app"
 ```
 
-## License
 
-[Add your license information here]
 
 ## Batch Processor
 
@@ -219,8 +217,8 @@ python processor_example.py production
 ### Example Key File Structure
 
 ```
-/etc/mindpulse/keys/
-├── 12345678  # Hex-encoded AES key for subject 12345678
-├── abcdef12  # Hex-encoded AES key for subject abcdef12
+/var/mindpulse/keys/
+├── 12345678.key  # Hex-encoded AES key for subject 12345678
+├── abcdef12.key  # Hex-encoded AES key for subject abcdef12
 └── ...
 ```
