@@ -9,9 +9,6 @@ A proof-of-concept Flask application for handling Android screenshot uploads. Th
 - **Batch Processor**: Processes encrypted files with AES decryption, MIME type detection, and rsync
 - **Simple & Fast**: No file validation or verification - just saves files
 - **Configuration Management**: Environment-based configuration with multiple profiles
-- **Health Check**: Built-in health check endpoint
-- **Modern Python**: Uses Python 3.13+ with type hints and modern practices
-- **Production Ready**: Includes proper error handling, logging, and security measures
 
 ## Quick Start
 
@@ -62,6 +59,33 @@ The application uses environment variables for configuration. Copy `env.example`
 - `MINDPULSE_KEYS_PATH`: Directory containing AES key files in hex format (default: `/etc/mindpulse/keys`)
 - `MINDPULSE_RSYNC_DEST_BASE`: Base rsync destination for processed files (default: `user@remote-server:/path/to/destination`)
 
+## Data flow
+
+The endpoint expects batches of files submitted by the client, and sequentially processes
+those batches. Files inside of a batch must be named according to this structure:
+
+```
+{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext
+```
+
+subject_short_hash must correspond to the 8-character hex hash for an enrollment key.
+the timestamp should look like 2025-09-25T09:13:49-05:00
+the encryption_iv must be a 24-hex digit string corresponding to a 12-byte IV
+
+In practice, the hash should be the same for all files in a batch, but that is not necessary.
+
+Data will flow between directories in this fashion, to keep each step simple and also ensure idempotency in processing. All directories are relative to MINDPULSE_UPLOAD_PATH, and should reside on the same filesystem:
+
+01_incoming_batches/ -- where the main Flask app will save files as they come in
+02_complete_batches/ -- where the main Flask will move complete batches
+03_processing/ -- where the processor script will decrypt and organize files
+04_ready_for_upload/ -- where the processor script places files ready for upload
+05_uploaded/ -- where files go, post-upload
+99_failed/ -- where failed files go
+
+Batches will come in to temporary directories and remain in those directories through their
+transit.
+
 ## API Endpoints
 
 ### POST /api/v1/upload
@@ -71,7 +95,7 @@ Uploads multiple files from Android devices.
 **Request:**
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Files must be named according to the pattern "{subject_hash}_{timestamp}.{ext}" -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an epoch time with millisecond precision. {ext} will generally, but not necessarily, be an image extension
+- Files must be named according to the pattern `{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext` -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an ISO time with timezone offset. {ext} will generally, but not necessarily, be an image extension
 - Files not matching this pattern will be logged but not saved.
 - Files in a batch will generally have the same subject_hash but it's not a problem if they don't
 

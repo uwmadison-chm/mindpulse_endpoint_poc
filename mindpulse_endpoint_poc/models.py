@@ -152,23 +152,34 @@ class Batch:
     * A set of files with normalized, safe names
     """
 
+    incoming_path: Path
+    complete_path: Path
     batch_path: Path
     success_files: List[EncryptedMPFile]
     failure_files: List[Path]
 
     @classmethod
-    def create_batch_dir(kls, base_dir):
-        batch_path = Path(tempfile.mktemp(dir=base_dir))
-        return kls(batch_path=batch_path, success_files=[], failure_files=[])
+    def setup_for_transfer(kls, incoming_path, complete_path):
+        batch_path = Path(tempfile.mkdtemp(dir=incoming_path))
+        return kls(
+            incoming_path=incoming_path,
+            complete_path=complete_path,
+            batch_path=batch_path,
+            success_files=[],
+            failure_files=[],
+        )
 
-    def process_files(self, files):
+    def process_batch(self, files):
+        self._process_files(files)
+        self._move_to_complete()
+
+    def _process_files(self, files):
         """
         Process a batch of files, saving them to the batch directory
 
         Args:
             files: Dict of file objects from Flask request.files
         """
-        self.batch_path.mkdir(parents=True, exist_ok=True)
 
         for file_key, file_obj in files.items():
             try:
@@ -193,25 +204,16 @@ class Batch:
                 )
                 self.failure_files.append(file_obj.filename)
 
-    def move_to_ready(self, ready_dir):
+    def _move_to_complete(self):
         """
-        Move the entire batch directory to the ready directory
-
-        Args:
-            ready_dir: Path to the ready directory
+        Move the entire batch directory to the completed directory
         """
-        ready_dir = Path(ready_dir)
-        ready_dir.mkdir(parents=True, exist_ok=True)
-
-        batch_name = self.batch_path.name
-        dest_path = ready_dir / batch_name
-
+        dest_path = self.complete_path / self.batch_path.name
         result = self.batch_path.rename(dest_path)
-        logger.debug(f"Moved batch {batch_name} -> {result}")
+        logger.debug(f"Moved batch to {result}")
 
         # Update batch_path to new location
-        self.batch_path = dest_path
-        return result
+        self.batch_path = result
 
 
 def short_sha_for_hex(hex_str):

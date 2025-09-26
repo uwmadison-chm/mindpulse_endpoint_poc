@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 from typing import Dict, Tuple, Any
-from flask import request, current_app
+from flask import request
 
 from .models import Batch
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def register_api_v1_routes(app):
     """Register v1 API routes with the Flask app."""
-    
+
     @app.route("/api/v1/upload", methods=["POST"])
     def upload() -> Tuple[Dict[str, Any], int]:
         """
@@ -29,41 +29,44 @@ def register_api_v1_routes(app):
         if not request.files:
             return {"error": "No files found in request"}, 400
 
-        upload_path = current_app.config["UPLOAD_PATH"]
-
         # Create batch and process files
-        batch = Batch.create_batch_dir(upload_path)
-        batch.process_files(request.files)
+        batch = Batch.setup_for_transfer(
+            app.config["INCOMING_BATCH_PATH"], app.config["COMPLETE_BATCH_PATH"]
+        )
+        batch.process_batch(request.files)
 
         if not batch.success_files:
             return {"error": "No valid files found in request"}, 400
 
-        # Move to ready directory
-        ready_dir = upload_path / "ready"
-        batch.move_to_ready(ready_dir)
+        logger.info(
+            f"Successfully uploaded {len(batch.success_files)} files to {batch.batch_path}"
+        )
 
-        logger.info(f"Successfully uploaded {len(batch.success_files)} files to {upload_path}")
-
-        response_data = {
-            "message": f"{len(batch.success_files)} files uploaded successfully"
+        resp_data = {
+            "message": f"{len(batch.success_files)} files uploaded successfully",
+            "error_files": [],
         }
 
         if batch.failure_files:
-            response_data["invalid_files"] = batch.failure_files
-            response_data["message"] += f" ({len(batch.failure_files)} invalid files ignored)"
+            resp_data["error_files"] = [str(f) for f in batch.failure_files]
+            resp_data["message"] += f" ({len(batch.failure_files)} error files ignored)"
 
-        return response_data, 201
+        return resp_data, 201
 
     @app.route("/api/v1/health", methods=["GET"])
     def health_check() -> Tuple[Dict[str, Any], int]:
         """
         Health check endpoint.
-        
+
         Returns:
             JSON response indicating service health
         """
-        status_dict = {"status": "healthy", "service": "mindpulse-endpoint-poc", "version": "v1"}
+        status_dict = {
+            "status": "healthy",
+            "service": "mindpulse-endpoint-poc",
+            "version": "v1",
+        }
         if app.debug:
             config_dict = {k: str(v) for k, v in app.config.items()}
-            status_dict['config_strings'] = config_dict
+            status_dict["config_strings"] = config_dict
         return status_dict, 200
