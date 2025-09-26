@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Usage: python -m scripts.process_batches [options]
+Usage: process_batches.py [options]
 
 This script watches for directories to come into the COMPLETE_BATCH_PATH path
 and when it does:
@@ -31,17 +31,18 @@ Options:
 """
 
 import logging
-import queue
 import shutil
 import sys
-import threading
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from docopt import docopt
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
+
+# Add the parent directory to sys.path to import the models and app
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mindpulse_endpoint_poc.models import EncryptedMPFile, EnrollmentKey, Decryptor
 from app import create_app
@@ -55,22 +56,13 @@ class BatchEventHandler(FileSystemEventHandler):
     def __init__(self, processor: "BatchProcessor"):
         self.processor = processor
 
-    def on_created(self, event: FileSystemEvent):
-        """Handle directory creation events."""
-        if event.is_directory:
-            batch_path = Path(event.src_path)
-            logger.info(f"New batch directory detected: {batch_path.name}")
-
-            # Add small delay to ensure directory is complete, then queue it
-            threading.Timer(2.0, self._queue_batch, args=[batch_path]).start()
-
-    def _queue_batch(self, batch_path: Path):
-        """Queue a batch for processing after ensuring it's complete."""
-        if batch_path.exists() and batch_path.is_dir():
-            logger.info(f"Queuing batch for processing: {batch_path.name}")
-            self.processor.batch_queue.put(batch_path)
-        else:
-            logger.warning(f"Batch directory no longer exists: {batch_path}")
+    def on_any_event(self, event: FileSystemEvent):
+        """Handle any file system event in the complete batches directory."""
+        logger.info(
+            f"File system event detected: {event.event_type} - {event.src_path}"
+        )
+        # Just process everything in the complete batches directory
+        self.processor.process_all_complete_batches()
 
 
 class BatchProcessor:
@@ -92,11 +84,6 @@ class BatchProcessor:
         self.failed_path = app_config["FAILED_PATH"]
         self.keys_path = app_config["KEYS_PATH"]
 
-        # Queue and threading setup
-        self.batch_queue = queue.Queue()
-        self.worker_thread: Optional[threading.Thread] = None
-        self.running = False
-
         # Ensure all directories exist (they should already from app initialization)
         for dir_path in [self.processing_path, self.processed_path, self.failed_path]:
             dir_path.mkdir(parents=True, exist_ok=True)
@@ -104,7 +91,6 @@ class BatchProcessor:
         # Create processing subdirectories
         (self.processing_path / "in").mkdir(parents=True, exist_ok=True)
         (self.processing_path / "out").mkdir(parents=True, exist_ok=True)
-
 
     def process_batch(self, batch_dir: Path) -> Dict[str, Any]:
         """
@@ -245,61 +231,48 @@ class BatchProcessor:
             if location.exists():
                 try:
                     shutil.move(location, failed_dest)
-                    logger.warning(f"Moved failed batch to: {failed_dest} (reason: {reason})")
+                    logger.warning(
+                        f"Moved failed batch to: {failed_dest} (reason: {reason})"
+                    )
                     moved = True
                     break
                 except Exception as move_error:
-                    logger.error(f"Failed to move batch from {location} to failed directory: {move_error}")
+                    logger.error(
+                        f"Failed to move batch from {location} to failed directory: {move_error}"
+                    )
 
         if not moved:
-            logger.error(f"Could not find batch {batch_name} to move to failed directory")
+            logger.error(
+                f"Could not find batch {batch_name} to move to failed directory"
+            )
 
-    def _process_queue(self):
-        """Worker thread that processes batches from the queue."""
-        logger.info("Starting batch processing worker thread")
+    def process_all_complete_batches(self):
+        """Process all directories in the complete batch path."""
+        logger.info("Processing all batches in complete directory...")
 
-        while self.running:
-            try:
-                # Get batch from queue with timeout
-                batch_path = self.batch_queue.get(timeout=1.0)
+        if not self.complete_batch_path.exists():
+            logger.warning(
+                f"Complete batch path does not exist: {self.complete_batch_path}"
+            )
+            return
 
-                if batch_path and batch_path.exists() and batch_path.is_dir():
-                    logger.info(f"Processing queued batch: {batch_path.name}")
-                    self.process_batch_safe(batch_path)
-                else:
-                    logger.warning(f"Skipping invalid batch path: {batch_path}")
+        # Process each directory in complete batches
+        for item in self.complete_batch_path.iterdir():
+            if item.is_dir():
+                logger.info(f"Found batch to process: {item.name}")
+                self.process_batch_safe(item)
 
-                # Mark task as done
-                self.batch_queue.task_done()
-
-            except queue.Empty:
-                # Timeout occurred, continue loop to check running flag
-                continue
-            except Exception as e:
-                logger.error(f"Error in queue processing: {e}")
-                try:
-                    self.batch_queue.task_done()
-                except:
-                    pass
-
-        logger.info("Batch processing worker thread stopped")
+        logger.info("Finished processing all complete batches")
 
     def start_processing(self):
-        """Start the complete batch processing system."""
+        """Start the batch processing system."""
         logger.info("Starting batch processing system")
 
-        # Set running flag
-        self.running = True
-
-        # Start worker thread
-        self.worker_thread = threading.Thread(target=self._process_queue, daemon=True)
-        self.worker_thread.start()
+        # Process any existing batches first
+        self.process_all_complete_batches()
 
         # Start file watcher
         observer = self.start_watching()
-
-        # Queue existing batches
-        self.queue_existing_batches()
 
         logger.info("Batch processing system started")
         return observer
@@ -321,36 +294,6 @@ class BatchProcessor:
         logger.info(f"Keys path: {self.keys_path}")
 
         return observer
-
-    def queue_existing_batches(self):
-        """Add existing batch directories to the processing queue."""
-        logger.info("Queuing existing batch directories...")
-
-        # Check complete batch directory
-        if self.complete_batch_path.exists():
-            for item in self.complete_batch_path.iterdir():
-                if item.is_dir():
-                    logger.info(f"Queuing existing batch: {item.name}")
-                    self.batch_queue.put(item)
-
-        logger.info("Finished queuing existing batches")
-
-    def stop_processing(self):
-        """Stop the batch processing system gracefully."""
-        logger.info("Stopping batch processing system")
-
-        # Stop accepting new work
-        self.running = False
-
-        # Wait for current work to finish
-        if self.worker_thread and self.worker_thread.is_alive():
-            logger.info("Waiting for worker thread to finish...")
-            self.worker_thread.join(timeout=5.0)
-
-            if self.worker_thread.is_alive():
-                logger.warning("Worker thread did not finish within timeout")
-
-        logger.info("Batch processing system stopped")
 
 
 def main():
@@ -386,9 +329,6 @@ def main():
         # Stop the file observer
         observer.stop()
         observer.join()
-
-        # Stop the processing system
-        processor.stop_processing()
 
         logger.info("Batch processor stopped")
 
