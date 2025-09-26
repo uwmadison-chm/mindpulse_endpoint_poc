@@ -214,6 +214,14 @@ def submit_files_to_api(
     try:
         logger.info(f"Submitting {len(encrypted_files)} files to {upload_url}")
 
+        # Log what we're sending
+        print("\n=== Files Being Sent to Server ===")
+        for file_key, (filename, file_handle, content_type) in files_dict.items():
+            file_size = file_handle.seek(0, 2)  # Get file size
+            file_handle.seek(0)  # Reset file pointer
+            logger.info(f"{file_key}: {filename} ({file_size} bytes)")
+        print()
+
         response = requests.post(upload_url, files=files_dict)
 
         # Close all file handles
@@ -323,6 +331,11 @@ def main():
 
             if "invalid_files" in response:
                 logger.warning(f"Invalid files: {response['invalid_files']}")
+
+        # Print complete server response
+        print("\n=== Complete Server Response ===")
+        import json
+        print(json.dumps(response, indent=2, default=str))
 
     except Exception as e:
         logger.error(f"Error: {e}")
