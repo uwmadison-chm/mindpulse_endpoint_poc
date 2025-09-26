@@ -69,7 +69,7 @@ those batches. Files inside of a batch must be named according to this structure
 ```
 
 subject_short_hash must correspond to the 8-character hex hash for an enrollment key.
-the timestamp should look like 2025-09-25T09:13:49-05:00
+the timestamp should look like 2025-09-25T091349-0500
 the encryption_iv must be a 24-hex digit string corresponding to a 12-byte IV
 
 In practice, the hash should be the same for all files in a batch, but that is not necessary.
@@ -95,16 +95,9 @@ Uploads multiple files from Android devices.
 **Request:**
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Files must be named according to the pattern `{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext` -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an ISO time with timezone offset. {ext} will generally, but not necessarily, be an image extension
+- Files must be named according to the pattern `{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext` -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an ISO time with timezone offset.
 - Files not matching this pattern will be logged but not saved.
 - Files in a batch will generally have the same subject_hash but it's not a problem if they don't
-
-**Example using curl:**
-```bash
-curl -X POST http://localhost:5000/api/v1/upload \
-  -F "file1=@12345678_1750890839000.png" \
-  -F "file2=@12345678_1750890853000.png"
-```
 
 **Response:**
 ```json
