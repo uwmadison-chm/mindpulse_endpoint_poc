@@ -103,16 +103,16 @@ def initialize_state(config: dict) -> None:
     config["PROCESSING_PATH"] = (
         upload_path / "03_processing"
     )  # where the processor script will decrypt and organize files
-    config["READY_FOR_UPLOAD_PATH"] = (
-        upload_path / "04_ready_for_upload"
+    config["PROCESSED_PATH"] = (
+        upload_path / "04_processed"
     )  #  where the processor script places files ready for upload
     config["UPLOADED_PATH"] = upload_path / "05_uploaded"  # where files go, post-upload
-    config["FAILED_PATH"] = upload_path / "99_failed"  # where failed files go
+    config["FAILED_PATH"] = upload_path / "99_failed"  # where failed files go, maybe
 
     config["INCOMING_BATCH_PATH"].mkdir(parents=True, exist_ok=True)
     config["COMPLETE_BATCH_PATH"].mkdir(parents=True, exist_ok=True)
     config["PROCESSING_PATH"].mkdir(parents=True, exist_ok=True)
-    config["READY_FOR_UPLOAD_PATH"].mkdir(parents=True, exist_ok=True)
+    config["PROCESSED_PATH"].mkdir(parents=True, exist_ok=True)
     config["UPLOADED_PATH"].mkdir(parents=True, exist_ok=True)
     config["FAILED_PATH"].mkdir(parents=True, exist_ok=True)
 
