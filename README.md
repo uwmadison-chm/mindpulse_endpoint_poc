@@ -72,6 +72,12 @@ subject_short_hash must correspond to the 8-character hex hash for an enrollment
 the timestamp should look like 2025-09-25T091349-0500
 the encryption_iv must be a 24-hex digit string corresponding to a 12-byte IV
 
+So an entire filename might look like
+
+```
+574a7f3e_2025-09-26T105446-0500_screenshot_30244efddd77730ec4e1c67f0e44c104.jpg
+```
+
 In practice, the hash should be the same for all files in a batch, but that is not necessary.
 
 Data will flow between directories in this fashion, to keep each step simple and also ensure idempotency in processing. All directories are relative to MINDPULSE_UPLOAD_PATH, and should reside on the same filesystem:
