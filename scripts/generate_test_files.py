@@ -106,8 +106,8 @@ def generate_encrypted_filename(
     Returns:
         Formatted filename
     """
-    # Format timestamp without microseconds but with timezone offset
-    timestamp_str = timestamp.replace(microsecond=0).isoformat()
+    # Format timestamp without microseconds but with timezone offset, remove colons for filename compatibility
+    timestamp_str = timestamp.replace(microsecond=0).isoformat().replace(":", "")
     iv_hex = iv.hex()
     return f"{short_key}_{timestamp_str}_{file_type}_{iv_hex}{original_ext}"
 
