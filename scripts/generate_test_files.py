@@ -113,7 +113,7 @@ def generate_encrypted_filename(
 
 
 def main():
-    args = docopt(__doc__)
+    args = docopt(str(__doc__))
 
     # Configure logging
     log_level = logging.DEBUG if args["--verbose"] else logging.INFO
