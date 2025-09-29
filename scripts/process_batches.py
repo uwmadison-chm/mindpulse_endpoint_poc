@@ -27,7 +27,8 @@ After that is complete, we'll move out/tmp1234 to READY_FOR_UPLOAD_PATH/
 
 
 Options:
-  --debug       Print debugging information
+  --verbose               Print debugging information
+  --debug-copy=<dir>      Copy each batch to the specified directory before processing
 """
 
 import logging
@@ -68,12 +69,13 @@ class BatchEventHandler(FileSystemEventHandler):
 class BatchProcessor:
     """Process batches of encrypted files using the new models architecture."""
 
-    def __init__(self, app_config: Dict[str, Any]):
+    def __init__(self, app_config: Dict[str, Any], debug_copy_dir: str = None):
         """
         Initialize processor with Flask app configuration.
 
         Args:
             app_config: Flask app configuration dictionary
+            debug_copy_dir: Optional directory to copy batches to before processing
         """
         self.config = app_config
         self.complete_batch_path = app_config["COMPLETE_BATCH_PATH"]
@@ -83,6 +85,7 @@ class BatchProcessor:
         ]  # This is "READY_FOR_UPLOAD_PATH"
         self.failed_path = app_config["FAILED_PATH"]
         self.keys_path = app_config["KEYS_PATH"]
+        self.debug_copy_dir = Path(debug_copy_dir) if debug_copy_dir else None
 
         # Ensure all directories exist (they should already from app initialization)
         for dir_path in [self.processing_path, self.processed_path, self.failed_path]:
@@ -91,6 +94,11 @@ class BatchProcessor:
         # Create processing subdirectories
         (self.processing_path / "in").mkdir(parents=True, exist_ok=True)
         (self.processing_path / "out").mkdir(parents=True, exist_ok=True)
+
+        # Create debug copy directory if specified
+        if self.debug_copy_dir:
+            self.debug_copy_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Debug copy enabled: batches will be copied to {self.debug_copy_dir}")
 
     def process_batch(self, batch_dir: Path) -> Dict[str, Any]:
         """
@@ -112,6 +120,12 @@ class BatchProcessor:
         batch_name = batch_dir.name
 
         try:
+            # Debug copy: save a copy of the entire batch before processing
+            if self.debug_copy_dir:
+                debug_copy_path = self.debug_copy_dir / batch_name
+                shutil.copytree(batch_dir, debug_copy_path)
+                logger.info(f"Debug copy: saved batch to {debug_copy_path}")
+
             # Move to processing/in/
             processing_in_path = self.processing_path / "in" / batch_name
             shutil.move(batch_dir, processing_in_path)
@@ -301,7 +315,7 @@ def main():
     args = docopt(str(__doc__))
 
     # Configure logging
-    log_level = logging.DEBUG if args["--debug"] else logging.INFO
+    log_level = logging.DEBUG if args["--verbose"] else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]",
@@ -313,7 +327,8 @@ def main():
     app = create_app()
 
     # Create processor
-    processor = BatchProcessor(app.config)
+    debug_copy_dir = args["--debug-copy"]
+    processor = BatchProcessor(app.config, debug_copy_dir)
 
     # Start the complete processing system (worker thread + file watcher + queue existing)
     observer = processor.start_processing()

@@ -70,7 +70,7 @@ those batches. Files inside of a batch must be named according to this structure
 
 subject_short_hash must correspond to the 8-character hex hash for an enrollment key.
 the timestamp should look like 2025-09-25T091349-0500
-the encryption_iv must be a 24-hex digit string corresponding to a 12-byte IV
+the encryption_iv must be a 32-hex digit string corresponding to a 16-byte IV
 
 So an entire filename might look like
 
