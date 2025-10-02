@@ -230,7 +230,7 @@ def submit_files_to_api(
 
         logger.info(f"API response: {response.status_code}")
 
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             response_data = response.json()
             logger.info(
                 f"Upload successful: {response_data.get('message', 'No message')}"

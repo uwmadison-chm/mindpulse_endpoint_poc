@@ -29,7 +29,7 @@ def _get_status_code(batch: Batch) -> int:
     num_errors = len(batch.error_messages)
 
     if num_errors == 0:
-        return 200
+        return 201
     elif num_success == 0:
         return 400
     else:

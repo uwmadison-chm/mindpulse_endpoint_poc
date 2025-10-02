@@ -84,7 +84,7 @@ def test_upload_single_file(client):
         content_type="multipart/form-data"
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.get_json()
     assert data["message"] == "1 file uploaded successfully"
     assert len(data["successes"]) == 1
@@ -123,7 +123,7 @@ def test_upload_multiple_files_same_batch(client):
         content_type="multipart/form-data"
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.get_json()
     assert data["message"] == "2 files uploaded successfully"
     assert len(data["successes"]) == 2
@@ -143,7 +143,7 @@ def test_upload_multiple_batches(client):
         content_type="multipart/form-data"
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.get_json()
     assert data["message"] == "2 files uploaded successfully"
     assert len(data["successes"]) == 2

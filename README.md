@@ -113,7 +113,8 @@ The response always contains three fields:
 - `errors`: List of error messages for files that failed
 
 **Status Codes:**
-- `200`: No files provided, or all files uploaded successfully
+- `200`: No files provided
+- `201`: All files uploaded successfully
 - `400`: Only errors occurred (no successful uploads)
 - `207`: Mixed results (some successes, some errors)
 
