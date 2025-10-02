@@ -69,7 +69,7 @@ those batches. Files inside of a batch must be named according to this structure
 ```
 
 subject_short_hash must correspond to the 8-character hex hash for an enrollment key.
-the timestamp should look like 2025-09-25T091349-0500
+the timestamp should be ISO8601 with timezone offset (colons are allowed in the timestamp but will be removed by the server when saving)
 the encryption_iv must be a 32-hex digit string corresponding to a 16-byte IV
 
 So an entire filename might look like
@@ -101,14 +101,48 @@ Uploads multiple files from Android devices.
 **Request:**
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Files must be named according to the pattern `{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext` -- subject_hash is an 8-hex-digit hash identifying the subject, and {timestamp} is an ISO time with timezone offset.
+- Files must be named according to the pattern `{subject_short_hash}_{iso8601_timestamp_with_offset}_{data_type}_{encryption_iv}.ext` -- subject_hash is an 8-hex-digit hash identifying the subject, and timestamp is an ISO8601 time with timezone offset (colons allowed, will be removed when saving).
 - Files not matching this pattern will be logged but not saved.
 - Files in a batch will generally have the same subject_hash but it's not a problem if they don't
 
 **Response:**
+
+The response always contains three fields:
+- `message`: A single sentence describing the result
+- `successes`: List of successfully uploaded filenames (sanitized names)
+- `errors`: List of error messages for files that failed
+
+**Status Codes:**
+- `200`: No files provided, or all files uploaded successfully
+- `400`: Only errors occurred (no successful uploads)
+- `207`: Mixed results (some successes, some errors)
+
+**Examples:**
+
+All files successful:
 ```json
 {
-  "message": "2 files uploaded successfully"
+  "message": "2 files uploaded successfully",
+  "successes": ["12345678_2025-09-25T120000-0500_screenshot_abc123def456789012345678901234ab.jpg", "12345678_2025-09-25T120100-0500_screenshot_def456789012345678901234567890ab.jpg"],
+  "errors": []
+}
+```
+
+No files provided:
+```json
+{
+  "message": "No files provided",
+  "successes": [],
+  "errors": []
+}
+```
+
+Mixed results:
+```json
+{
+  "message": "1 file uploaded successfully, 1 error",
+  "successes": ["12345678_2025-09-25T120000-0500_screenshot_abc123def456789012345678901234ab.jpg"],
+  "errors": ["Error processing invalid_file.txt: Invalid filename format 'invalid_file.txt': ..."]
 }
 ```
 

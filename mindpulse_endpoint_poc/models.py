@@ -157,6 +157,7 @@ class Batch:
     batch_path: Path
     success_files: List[EncryptedMPFile]
     failure_files: List[Path]
+    error_messages: List[str]
 
     @classmethod
     def setup_for_transfer(kls, incoming_path, complete_path):
@@ -167,6 +168,7 @@ class Batch:
             batch_path=batch_path,
             success_files=[],
             failure_files=[],
+            error_messages=[],
         )
 
     def process_batch(self, files):
@@ -199,9 +201,9 @@ class Batch:
                 logger.info(f"Saved {target_path}")
 
             except (ValueError, Exception) as e:
-                logger.warning(
-                    f"Error processing file {file_key}: {safe_filename} - {e}"
-                )
+                message = f"Error processing {file_obj.filename}: {e}"
+                logger.warning(message)
+                self.error_messages.append(message)
                 self.failure_files.append(file_obj.filename)
 
     def _move_to_complete(self):
