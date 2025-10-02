@@ -183,3 +183,4 @@ output/
 
 start_flask.sh
 upload_test_files.sh
+upload_test_files_local.sh
