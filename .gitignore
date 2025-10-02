@@ -178,3 +178,8 @@ cython_debug/
 tmp/
 
 output/
+
+# Local scripts
+
+start_flask.sh
+upload_test_files.sh
