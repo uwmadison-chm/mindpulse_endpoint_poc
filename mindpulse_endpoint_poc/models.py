@@ -171,16 +171,17 @@ class Batch:
             error_messages=[],
         )
 
-    def process_batch(self, files):
-        self._process_files(files)
+    def process_batch(self, files, keys_path):
+        self._process_files(files, keys_path)
         self._move_to_complete()
 
-    def _process_files(self, files):
+    def _process_files(self, files, keys_path):
         """
         Process a batch of files, saving them to the batch directory
 
         Args:
             files: Dict of file objects from Flask request.files
+            keys_path: Path to enrollment keys directory
         """
 
         for file_key, file_obj in files.items():
@@ -189,7 +190,13 @@ class Batch:
                 logger.debug(f"Processing {file_key}: {safe_filename}")
 
                 # Validate filename format by attempting to parse it
-                EncryptedMPFile.from_filename(safe_filename)
+                mpfile_temp = EncryptedMPFile.from_filename(safe_filename)
+
+                # Validate enrollment key exists
+                try:
+                    EnrollmentKey.load_for_short_sha(keys_path, mpfile_temp.short_id)
+                except FileNotFoundError:
+                    raise ValueError(f"Enrollment key for {mpfile_temp.short_id} not found")
 
                 # Save the file to batch directory
                 target_path = self.batch_path / safe_filename

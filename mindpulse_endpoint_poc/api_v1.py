@@ -64,7 +64,7 @@ def register_api_v1_routes(app):
         batch = Batch.setup_for_transfer(
             app.config["INCOMING_BATCH_PATH"], app.config["COMPLETE_BATCH_PATH"]
         )
-        batch.process_batch(request.files)
+        batch.process_batch(request.files, app.config["KEYS_PATH"])
 
         # Build response
         successes = [mpfile.path.name for mpfile in batch.success_files]

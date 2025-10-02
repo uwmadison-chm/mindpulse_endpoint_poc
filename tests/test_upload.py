@@ -177,3 +177,23 @@ def test_upload_method_not_allowed(client):
     """Test upload endpoint with wrong HTTP method."""
     response = client.get("/api/v1/upload")
     assert response.status_code == 405
+
+
+def test_upload_unknown_enrollment_key(client):
+    """Test upload endpoint with file using unknown enrollment key."""
+    image_data = b"fake image data"
+
+    # Use a short_id that doesn't have a corresponding enrollment key
+    response = client.post(
+        "/api/v1/upload",
+        data={"file1": (BytesIO(image_data), "99999999_2025-09-25T120000-0500_image_f748062b37fcf5128420aa84201f0acb.png")},
+        content_type="multipart/form-data"
+    )
+
+    # Should return 400 because the enrollment key was not found
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["message"] == "0 files uploaded, 1 error"
+    assert data["successes"] == []
+    assert len(data["errors"]) == 1
+    assert "Enrollment key for 99999999 not found" in data["errors"][0]
